@@ -45,7 +45,6 @@ namespace ShyHeaderPivot
         const float endOffsetValue = -150;
 
         public List<Model> list { get; }
-        float offset;
         CancellationTokenSource cts;
         ScrollProgressProvider provider;
 
@@ -64,7 +63,7 @@ namespace ShyHeaderPivot
             var offsetExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startOffset}, {endOffset}, provider.progress)");
             var scaleExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startScale}, {endScale}, provider.progress)");
 
-            var providerProp = provider.CreatePropertySet();
+            var providerProp = provider.GetProgressPropertySet();
 
             offsetExp.SetReferenceParameter("host", gv);
             offsetExp.SetReferenceParameter("provider", providerProp);

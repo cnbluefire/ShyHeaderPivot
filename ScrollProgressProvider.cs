@@ -19,6 +19,8 @@ namespace ShyHeaderPivot
         private double lastOffset;
         private bool readyToScroll;
         private double innerProgress;
+        private CancellationTokenSource delayCancellationTokenSource;
+        private CompositionPropertySet scrollPropertySet;
 
         public ScrollProgressProvider()
         {
@@ -31,11 +33,7 @@ namespace ShyHeaderPivot
         }
 
 
-        public ScrollViewer ScrollViewer
-        {
-            get { return (ScrollViewer)GetValue(ScrollViewerProperty); }
-            set { SetValue(ScrollViewerProperty, value); }
-        }
+        #region Dependency Properties
 
         // Using a DependencyProperty as the backing store for ScrollViewer.  This enables animation, styling, binding, etc...
         public static readonly DependencyProperty ScrollViewerProperty =
@@ -50,11 +48,36 @@ namespace ShyHeaderPivot
                 }
             }));
 
-        public double Threshold
+
+        /// <summary>
+        /// 改变ScrollViewer
+        /// </summary>
+        /// <param name="oldSv"></param>
+        /// <param name="newSv"></param>
+        private void ScrollViewerChanged(ScrollViewer oldSv, ScrollViewer newSv)
         {
-            get { return (double)GetValue(ThresholdProperty); }
-            set { SetValue(ThresholdProperty, value); }
+            if (oldSv != null)
+            {
+                oldSv.ViewChanged -= ScrollViewer_ViewChanged;
+                oldSv.Unloaded -= ScrollViewer_Unloaded;
+
+                propSet.InsertScalar("progress", (float)innerProgress);
+            }
+
+            if (newSv != null)
+            {
+                readyToScroll = true;
+
+                if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
+                    StartScrollProgressAnimation(newSv, false);
+                else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold || (newSv.VerticalOffset > Threshold && lastOffset > Threshold))
+                    SyncScrollView(newSv);
+
+                newSv.ViewChanged += ScrollViewer_ViewChanged;
+                newSv.Unloaded += ScrollViewer_Unloaded;
+            }
         }
+
 
         public static readonly DependencyProperty ThresholdProperty =
             DependencyProperty.Register("Threshold", typeof(double), typeof(ScrollProgressProvider), new PropertyMetadata(0d, (s, a) =>
@@ -72,14 +95,6 @@ namespace ShyHeaderPivot
                     }
                 }
             }));
-
-
-
-        public double Progress
-        {
-            get { return (double)GetValue(ProgressProperty); }
-            set { SetValue(ProgressProperty, value); }
-        }
 
         // Using a DependencyProperty as the backing store for Progress.  This enables animation, styling, binding, etc...
         public static readonly DependencyProperty ProgressProperty =
@@ -104,29 +119,97 @@ namespace ShyHeaderPivot
                 }
             }));
 
-        private void ScrollViewerChanged(ScrollViewer oldSv, ScrollViewer newSv)
-        {
-            if (oldSv != null)
-            {
-                oldSv.ViewChanged -= ScrollViewer_ViewChanged;
-                oldSv.Unloaded -= ScrollViewer_Unloaded;
+        #endregion Dependency Properties
 
-                propSet.InsertScalar("progress", (float)innerProgress);
+        #region Properties
+
+        public ScrollViewer ScrollViewer
+        {
+            get { return (ScrollViewer)GetValue(ScrollViewerProperty); }
+            set { SetValue(ScrollViewerProperty, value); }
+        }
+
+        /// <summary>
+        /// 阈值
+        /// </summary>
+        public double Threshold
+        {
+            get { return (double)GetValue(ThresholdProperty); }
+            set { SetValue(ThresholdProperty, value); }
+        }
+
+        /// <summary>
+        /// 进度
+        /// </summary>
+        public double Progress
+        {
+            get { return (double)GetValue(ProgressProperty); }
+            set { SetValue(ProgressProperty, value); }
+        }
+
+        #endregion Properties
+
+        #region Methods
+
+        /// <summary>
+        /// 将Progress绑定到ScrollViewer
+        /// </summary>
+        /// <param name="sv"></param>
+        /// <param name="delay"></param>
+        private async void StartScrollProgressAnimation(ScrollViewer sv, bool delay)
+        {
+            readyToScroll = false;
+            if (delayCancellationTokenSource != null)
+            {
+                delayCancellationTokenSource.Cancel();
+                delayCancellationTokenSource = null;
             }
 
-            if (newSv != null)
+            if (delay)
+                delayCancellationTokenSource = new CancellationTokenSource();
+
+            try
             {
-                readyToScroll = true;
+                if (sv.VerticalOffset > 0 && delay)
+                    await Task.Delay(150, delayCancellationTokenSource.Token);
 
-                if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
-                    StartScrollBind(newSv);
-                else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold || (newSv.VerticalOffset > Threshold && lastOffset > Threshold))
-                    SyncScrollView(newSv);
+                scrollPropertySet = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(sv);
 
-                newSv.ViewChanged += ScrollViewer_ViewChanged;
-                newSv.Unloaded += ScrollViewer_Unloaded;
+                var exp = Window.Current.Compositor.CreateExpressionAnimation($"clamp(-sv.Translation.Y, 0f, prop.threshold) / prop.threshold");
+                exp.SetReferenceParameter("sv", scrollPropertySet);
+                exp.SetReferenceParameter("prop", propSet);
+
+                propSet.StartAnimation("progress", exp);
+
+            }
+            catch
+            {
+
             }
         }
+
+        /// <summary>
+        /// 同步ScrollOffset
+        /// </summary>
+        /// <param name="sv"></param>
+        private void SyncScrollView(ScrollViewer sv)
+        {
+            if (sv == null) return;
+
+            sv.ChangeView(null, Threshold * Progress, null, true);
+        }
+
+        public CompositionPropertySet GetProgressPropertySet()
+        {
+            var _propSet = Window.Current.Compositor.CreatePropertySet();
+            _propSet.InsertScalar("progress", (float)innerProgress);
+            _propSet.StartAnimation("progress", progressBind);
+            return _propSet;
+        }
+
+        #endregion Methods
+
+        #region Event Callback Methods
 
         private void ScrollViewer_Unloaded(object sender, RoutedEventArgs e)
         {
@@ -143,57 +226,13 @@ namespace ShyHeaderPivot
             if (readyToScroll)
             {
                 readyToScroll = false;
-                StartScrollBind((ScrollViewer)sender);
+                StartScrollProgressAnimation((ScrollViewer)sender, true);
             }
         }
 
-        CancellationTokenSource cts;
+        #endregion Event Callback Methods
 
-        private async void StartScrollBind(ScrollViewer sv)
-        {
-            if (cts != null)
-                cts.Cancel();
-
-            cts = new CancellationTokenSource();
-
-            innerProgress = GetProgress(lastOffset, Threshold);
-            try
-            {
-                if (sv.VerticalOffset > 0)
-                    await Task.Delay(150, cts.Token);
-
-                propSet.InsertScalar("progress", (float)innerProgress);
-
-                var svp = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(sv);
-
-                var exp = Window.Current.Compositor.CreateExpressionAnimation($"clamp(-sv.Translation.Y, 0f, prop.threshold) / prop.threshold");
-                exp.SetReferenceParameter("sv", svp);
-                exp.SetReferenceParameter("prop", propSet);
-
-                propSet.StartAnimation("progress", exp);
-            }
-            catch
-            {
-
-            }
-            Progress = innerProgress;
-
-        }
-
-        private void SyncScrollView(ScrollViewer sv)
-        {
-            if (sv == null) return;
-
-            sv.ChangeView(null, Threshold * Progress, null, true);
-        }
-
-        public CompositionPropertySet CreatePropertySet()
-        {
-            var _propSet = Window.Current.Compositor.CreatePropertySet();
-            _propSet.InsertScalar("progress", 0f);
-            _propSet.StartAnimation("progress", progressBind);
-            return _propSet;
-        }
+        #region Events
 
         public event TypedEventHandler<object, double> ProgressChanged;
         protected void OnProgressChanged()
@@ -203,12 +242,17 @@ namespace ShyHeaderPivot
             System.Diagnostics.Debug.WriteLine(Progress);
         }
 
+        #endregion Events
+
+        #region Utilities
 
         private static double GetProgress(double offset, double threshold)
         {
             if (threshold == 0) return 0;
             return Math.Min(1, Math.Max(0, offset / threshold));
         }
+
+        #endregion Utilities
 
     }
 }
