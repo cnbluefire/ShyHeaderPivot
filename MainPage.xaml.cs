@@ -37,22 +37,22 @@ namespace ShyHeaderPivot
                 Title = $"第{c}个标题",
                 Brushes = Enumerable.Range(0, 50).Select(x => colors[rnd.Next(colors.Length)]).Select(x => new SolidColorBrush(x)).ToList()
             }).ToList();
+
+            provider = new ScrollProgressProvider();
+            provider.Threshold = 150d;
         }
 
         const float endOffsetValue = -150;
 
         public List<Model> list { get; }
-        ScrollViewer sv;
         float offset;
         CancellationTokenSource cts;
-        bool readyToStart;
+        ScrollProgressProvider provider;
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
             var gv = ElementCompositionPreview.GetElementVisual(Target);
             var tv = ElementCompositionPreview.GetElementVisual(HeaderText);
-
-            var progress = $"clamp(host.Offset.Y / {endOffsetValue}f, 0f ,1f)";
 
             var startOffset = "Vector3((host.Size.X - this.Target.Size.X) / 2, (host.Size.Y - 50 - this.Target.Size.Y) / 2, 1f)";
             var endOffset = $"Vector3(0f, -{endOffsetValue}f, 1f)";
@@ -61,66 +61,34 @@ namespace ShyHeaderPivot
             var startScale = "Vector3(1f, 1f, 1f)";
             var endScale = $"Vector3({scale}, {scale}, 1f)";
 
-            var offsetExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startOffset}, {endOffset}, {progress})");
-            var scaleExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startScale}, {endScale}, {progress})");
+            var offsetExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startOffset}, {endOffset}, provider.progress)");
+            var scaleExp = Window.Current.Compositor.CreateExpressionAnimation($"lerp({startScale}, {endScale}, provider.progress)");
+
+            var providerProp = provider.CreatePropertySet();
 
             offsetExp.SetReferenceParameter("host", gv);
+            offsetExp.SetReferenceParameter("provider", providerProp);
             scaleExp.SetReferenceParameter("host", gv);
+            scaleExp.SetReferenceParameter("provider", providerProp);
 
             tv.StartAnimation("Offset", offsetExp);
             tv.StartAnimation("Scale", scaleExp);
+
+            var gvOffsetExp = Window.Current.Compositor.CreateExpressionAnimation("Vector3(0f, -150f * provider.progress, 0f)");
+            gvOffsetExp.SetReferenceParameter("provider", providerProp);
+
+            gv.StartAnimation("Offset", gvOffsetExp);
         }
 
         private async void Pivot_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var container = Pivot.ContainerFromItem(Pivot.SelectedItem) as PivotItem;
 
-            var gv = ElementCompositionPreview.GetElementVisual(Target);
-            gv.Offset = new System.Numerics.Vector3(0, offset, 0);
-
             if (cts != null) cts.Cancel();
             cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             var contentTemplateRoot = await WaitForLoaded(container, () => container.ContentTemplateRoot as FrameworkElement, c => c != null, cts.Token);
 
-            if (sv != null)
-                sv.ViewChanged -= Sv_ViewChanged;
-
-            sv = contentTemplateRoot.FindName("sv") as ScrollViewer;
-
-            sv = ((FrameworkElement)container.ContentTemplateRoot).FindName("sv") as ScrollViewer;
-            InitScrollViewer(sv);
-        }
-
-        private void Sv_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
-        {
-            offset = Math.Max(endOffsetValue, Math.Min(0, (float)-sv.VerticalOffset));
-            if (e.IsIntermediate && readyToStart)
-            {
-                readyToStart = false;
-                StartScrollBind((ScrollViewer)sender);
-            }
-        }
-
-        private void StartScrollBind(ScrollViewer sv)
-        {
-            var sp = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(sv);
-
-            var exp = Window.Current.Compositor.CreateExpressionAnimation($"clamp(prop.Translation.Y, {endOffsetValue}f, 0f)");
-            exp.SetReferenceParameter("prop", sp);
-
-            var gv = ElementCompositionPreview.GetElementVisual(Target);
-            gv.StartAnimation("Offset.Y", exp);
-        }
-
-        private void InitScrollViewer(ScrollViewer sv)
-        {
-            if (sv == null) return;
-            readyToStart = true;
-
-            if (sv.VerticalOffset < 200 || offset < endOffsetValue || (sv.VerticalOffset > 200 && offset > endOffsetValue))
-                sv.ChangeView(null, -offset, null, true);
-
-            sv.ViewChanged += Sv_ViewChanged;
+            provider.ScrollViewer = contentTemplateRoot.FindName("sv") as ScrollViewer;
         }
 
         private async Task<T> WaitForLoaded<T>(FrameworkElement element, Func<T> func, Predicate<T> pre, CancellationToken cancellationToken)
