@@ -117,7 +117,7 @@ namespace ShyHeaderPivot
             if (sv == null) return;
             readyToStart = true;
 
-            if (sv.VerticalOffset < 200 || offset < endOffsetValue)
+            if (sv.VerticalOffset < 200 || offset < endOffsetValue || (sv.VerticalOffset > 200 && offset > endOffsetValue))
                 sv.ChangeView(null, -offset, null, true);
 
             sv.ViewChanged += Sv_ViewChanged;
