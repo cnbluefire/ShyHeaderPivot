@@ -118,7 +118,9 @@ namespace ShyHeaderPivot
             {
                 readyToScroll = true;
 
-                if (newSv.VerticalOffset < Threshold || lastOffset < Threshold || (newSv.VerticalOffset > Threshold && lastOffset > Threshold))
+                if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
+                    StartScrollBind(newSv);
+                else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold || (newSv.VerticalOffset > Threshold && lastOffset > Threshold))
                     SyncScrollView(newSv);
 
                 newSv.ViewChanged += ScrollViewer_ViewChanged;
