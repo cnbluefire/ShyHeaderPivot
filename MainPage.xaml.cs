@@ -73,7 +73,7 @@ namespace ShyHeaderPivot
             tv.StartAnimation("Offset", offsetExp);
             tv.StartAnimation("Scale", scaleExp);
 
-            var gvOffsetExp = Window.Current.Compositor.CreateExpressionAnimation("Vector3(0f, -150f * provider.progress, 0f)");
+            var gvOffsetExp = Window.Current.Compositor.CreateExpressionAnimation("Vector3(0f, -provider.threshold * provider.progress, 0f)");
             gvOffsetExp.SetReferenceParameter("provider", providerProp);
 
             gv.StartAnimation("Offset", gvOffsetExp);

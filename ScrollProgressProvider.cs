@@ -16,6 +16,7 @@ namespace ShyHeaderPivot
     {
         private readonly CompositionPropertySet propSet;
         private readonly ExpressionAnimation progressBind;
+        private readonly ExpressionAnimation thresholdBind;
         private double lastOffset;
         private bool readyToScroll;
         private double innerProgress;
@@ -31,6 +32,9 @@ namespace ShyHeaderPivot
 
             progressBind = Window.Current.Compositor.CreateExpressionAnimation("clamp(prop.progress, 0f, 1f)");
             progressBind.SetReferenceParameter("prop", propSet);
+
+            thresholdBind = Window.Current.Compositor.CreateExpressionAnimation("max(prop.threshold, 0f)");
+            thresholdBind.SetReferenceParameter("prop", propSet);
         }
 
 
@@ -208,7 +212,9 @@ namespace ShyHeaderPivot
         {
             var _propSet = Window.Current.Compositor.CreatePropertySet();
             _propSet.InsertScalar("progress", (float)innerProgress);
+            _propSet.InsertScalar("threshold", (float)Threshold);
             _propSet.StartAnimation("progress", progressBind);
+            _propSet.StartAnimation("threshold", thresholdBind);
             return _propSet;
         }
 
