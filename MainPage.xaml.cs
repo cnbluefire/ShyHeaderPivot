@@ -51,6 +51,7 @@ namespace ShyHeaderPivot
         private HashSet<ScrollViewer> scrolls;
         CancellationTokenSource cts;
         ScrollProgressProvider provider;
+        SpinLock spinLock = new SpinLock();
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
         {
@@ -92,7 +93,18 @@ namespace ShyHeaderPivot
             var contentTemplateRoot = await WaitForLoaded(container, () => container.ContentTemplateRoot as FrameworkElement, c => c != null, cts.Token);
 
             provider.ScrollViewer = contentTemplateRoot.FindName("sv") as ScrollViewer;
-            scrolls.Remove(provider.ScrollViewer);
+
+            var lockTaken = false;
+            try
+            {
+                spinLock.Enter(ref lockTaken);
+                scrolls.Remove(provider.ScrollViewer);
+            }
+            finally
+            {
+                if (lockTaken)
+                    spinLock.Exit();
+            }
         }
 
         private async Task<T> WaitForLoaded<T>(FrameworkElement element, Func<T> func, Predicate<T> pre, CancellationToken cancellationToken)
@@ -146,7 +158,18 @@ namespace ShyHeaderPivot
             if (sv != provider.ScrollViewer)
             {
                 sv.ChangeView(null, provider.Progress * provider.Threshold, null, true);
-                scrolls.Add(sv);
+
+                var lockTaken = false;
+                try
+                {
+                    spinLock.Enter(ref lockTaken);
+                    scrolls.Add(sv);
+                }
+                finally
+                {
+                    if (lockTaken)
+                        spinLock.Exit();
+                }
             }
         }
 
@@ -155,17 +178,38 @@ namespace ShyHeaderPivot
             var sv = (args.Item.ContentTemplateRoot as FrameworkElement).FindName("sv") as ScrollViewer;
             if (sv != null)
             {
-                scrolls.Remove(sv);
+                var lockTaken = false;
+                try
+                {
+                    spinLock.Enter(ref lockTaken);
+                    scrolls.Remove(sv);
+                }
+                finally
+                {
+                    if (lockTaken)
+                        spinLock.Exit();
+                }
             }
         }
 
 
         private void Provider_ProgressChanged(object sender, double args)
         {
-            foreach (var sv in scrolls)
+            var lockTaken = false;
+            try
             {
-                sv.ChangeView(null, provider.Progress * provider.Threshold, null, true);
+                spinLock.Enter(ref lockTaken);
+                foreach (var sv in scrolls)
+                {
+                    sv.ChangeView(null, provider.Progress * provider.Threshold, null, true);
+                }
             }
+            finally
+            {
+                if (lockTaken)
+                    spinLock.Exit();
+            }
+
         }
 
     }
