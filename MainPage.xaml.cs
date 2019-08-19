@@ -54,7 +54,7 @@ namespace ShyHeaderPivot
             var tv = ElementCompositionPreview.GetElementVisual(HeaderText);
 
             var startOffset = "Vector3((host.Size.X - this.Target.Size.X) / 2, (host.Size.Y - 50 - this.Target.Size.Y) / 2, 1f)";
-            var endOffset = $"Vector3(0f, -{endOffsetValue}f, 1f)";
+            var endOffset = $"Vector3(0f, provider.threshold, 1f)";
 
             var scale = "(50f / this.Target.Size.Y)";
             var startScale = "Vector3(1f, 1f, 1f)";
