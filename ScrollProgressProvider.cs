@@ -27,6 +27,7 @@ namespace ShyHeaderPivot
             propSet = Window.Current.Compositor.CreatePropertySet();
             propSet.InsertScalar("progress", 0f);
             propSet.InsertScalar("threshold", 0f);
+            propSet.InsertScalar("delayprogress", -1f);
 
             progressBind = Window.Current.Compositor.CreateExpressionAnimation("clamp(prop.progress, 0f, 1f)");
             progressBind.SetReferenceParameter("prop", propSet);
@@ -62,6 +63,7 @@ namespace ShyHeaderPivot
                 oldSv.Unloaded -= ScrollViewer_Unloaded;
 
                 propSet.InsertScalar("progress", (float)innerProgress);
+                propSet.InsertScalar("delayprogress", (float)innerProgress);
             }
 
             if (newSv != null)
@@ -70,7 +72,9 @@ namespace ShyHeaderPivot
 
                 if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
                     StartScrollProgressAnimation(newSv, false);
-                else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold || (newSv.VerticalOffset > Threshold && lastOffset > Threshold))
+                else if (newSv.VerticalOffset > Threshold && lastOffset > Threshold) // 前后进度都为1时 增加延迟防止闪烁
+                    StartScrollProgressAnimation(newSv, true);
+                else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold) //前后状态不同时 先设置滚动条位置再绑定动画
                     SyncScrollView(newSv);
 
                 newSv.ViewChanged += ScrollViewer_ViewChanged;
@@ -170,16 +174,17 @@ namespace ShyHeaderPivot
 
             try
             {
-                if (sv.VerticalOffset > 0 && delay)
-                    await Task.Delay(150, delayCancellationTokenSource.Token);
-
                 scrollPropertySet = ElementCompositionPreview.GetScrollViewerManipulationPropertySet(sv);
 
-                var exp = Window.Current.Compositor.CreateExpressionAnimation($"clamp(-sv.Translation.Y, 0f, prop.threshold) / prop.threshold");
+                var exp = Window.Current.Compositor.CreateExpressionAnimation($"(prop.delayprogress >= 0) ? prop.delayprogress : clamp(-sv.Translation.Y, 0f, prop.threshold) / prop.threshold");
                 exp.SetReferenceParameter("sv", scrollPropertySet);
                 exp.SetReferenceParameter("prop", propSet);
 
                 propSet.StartAnimation("progress", exp);
+
+                if (delay)
+                    await Task.Delay(150, delayCancellationTokenSource.Token);
+                propSet.InsertScalar("delayprogress", -1f);
 
             }
             catch
