@@ -38,13 +38,17 @@ namespace ShyHeaderPivot
                 Brushes = Enumerable.Range(0, 50).Select(x => colors[rnd.Next(colors.Length)]).Select(x => new SolidColorBrush(x)).ToList()
             }).ToList();
 
+            scrolls = new HashSet<ScrollViewer>();
+
             provider = new ScrollProgressProvider();
             provider.Threshold = 150d;
+            provider.ProgressChanged += Provider_ProgressChanged;
         }
 
         const float endOffsetValue = -150;
 
         public List<Model> list { get; }
+        private HashSet<ScrollViewer> scrolls;
         CancellationTokenSource cts;
         ScrollProgressProvider provider;
 
@@ -88,6 +92,7 @@ namespace ShyHeaderPivot
             var contentTemplateRoot = await WaitForLoaded(container, () => container.ContentTemplateRoot as FrameworkElement, c => c != null, cts.Token);
 
             provider.ScrollViewer = contentTemplateRoot.FindName("sv") as ScrollViewer;
+            scrolls.Remove(provider.ScrollViewer);
         }
 
         private async Task<T> WaitForLoaded<T>(FrameworkElement element, Func<T> func, Predicate<T> pre, CancellationToken cancellationToken)
@@ -133,6 +138,34 @@ namespace ShyHeaderPivot
                 }
             }
 
+        }
+
+        private void Pivot_PivotItemLoaded(Pivot sender, PivotItemEventArgs args)
+        {
+            var sv = (args.Item.ContentTemplateRoot as FrameworkElement).FindName("sv") as ScrollViewer;
+            if (sv != provider.ScrollViewer)
+            {
+                sv.ChangeView(null, provider.Progress * provider.Threshold, null, true);
+                scrolls.Add(sv);
+            }
+        }
+
+        private void Pivot_PivotItemUnloading(Pivot sender, PivotItemEventArgs args)
+        {
+            var sv = (args.Item.ContentTemplateRoot as FrameworkElement).FindName("sv") as ScrollViewer;
+            if (sv != null)
+            {
+                scrolls.Remove(sv);
+            }
+        }
+
+
+        private void Provider_ProgressChanged(object sender, double args)
+        {
+            foreach (var sv in scrolls)
+            {
+                sv.ChangeView(null, provider.Progress * provider.Threshold, null, true);
+            }
         }
 
     }

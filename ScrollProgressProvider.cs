@@ -59,7 +59,7 @@ namespace ShyHeaderPivot
         /// </summary>
         /// <param name="oldSv"></param>
         /// <param name="newSv"></param>
-        private void ScrollViewerChanged(ScrollViewer oldSv, ScrollViewer newSv)
+        private async void ScrollViewerChanged(ScrollViewer oldSv, ScrollViewer newSv)
         {
             if (oldSv != null)
             {
@@ -77,10 +77,14 @@ namespace ShyHeaderPivot
                 if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
                     StartScrollProgressAnimation(newSv, false);
                 else if (newSv.VerticalOffset > Threshold && lastOffset > Threshold) // 前后进度都为1时 增加延迟防止闪烁
-                    StartScrollProgressAnimation(newSv, true);
+                    StartScrollProgressAnimation(newSv, false);
+                else if (newSv.VerticalOffset == lastOffset)
+                    StartScrollProgressAnimation(newSv, false);
                 else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold) //前后状态不同时 先设置滚动条位置再绑定动画
-                    SyncScrollView(newSv);
-
+                {
+                    await SyncScrollView(newSv);
+                    StartScrollProgressAnimation(newSv, true);
+                }
                 newSv.ViewChanged += ScrollViewer_ViewChanged;
                 newSv.Unloaded += ScrollViewer_Unloaded;
             }
@@ -120,7 +124,7 @@ namespace ShyHeaderPivot
                     {
                         if (sender.innerProgress != (double)a.NewValue)
                         {
-                            sender.SyncScrollView(sender.ScrollViewer);
+                            _ = sender.SyncScrollView(sender.ScrollViewer);
                         }
                         sender.OnProgressChanged();
                     }
@@ -201,12 +205,26 @@ namespace ShyHeaderPivot
         /// 同步ScrollOffset
         /// </summary>
         /// <param name="sv"></param>
-        private void SyncScrollView(ScrollViewer sv)
+        private async Task SyncScrollView(ScrollViewer sv)
         {
             if (sv == null) return;
 
+            var tcs = new TaskCompletionSource<bool>();
+
+            sv.ViewChanged += Sv_ViewChanged;
             sv.ChangeView(null, Threshold * Progress, null, true);
+            await tcs.Task;
+
+            void Sv_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+            {
+                if (!e.IsIntermediate)
+                {
+                    sv.ViewChanged -= Sv_ViewChanged;
+                    tcs.SetResult(true);
+                }
+            }
         }
+
 
         public CompositionPropertySet GetProgressPropertySet()
         {
