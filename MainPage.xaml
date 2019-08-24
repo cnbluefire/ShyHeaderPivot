@@ -15,17 +15,24 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <Grid x:Name="Target" Canvas.ZIndex="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid x:Name="Target" Canvas.ZIndex="1" Background="Transparent">
             <Grid.RowDefinitions>
                 <RowDefinition Height="200" />
                 <RowDefinition Height="50" />
             </Grid.RowDefinitions>
-            <Grid Background="#007acc">
+            <Grid>
+                <Grid.Background>
+                    <AcrylicBrush x:Name="GridBackground" TintColor="#007acc" FallbackColor="#007acc" TintOpacity="1" BackgroundSource="Backdrop" />
+                </Grid.Background>
                 <Border x:Name="HeaderText" HorizontalAlignment="Left" VerticalAlignment="Top">
                     <TextBlock Foreground="White" FontSize="48" Margin="20,20">Header</TextBlock>
                 </Border>
             </Grid>
-            <controls:ShyHeader ItemsSource="{x:Bind list}" DisplayMemberPath="Title" SelectedIndex="{x:Bind Pivot.SelectedIndex,Mode=TwoWay}" Grid.Row="1" />
+            <controls:ShyHeader ItemsSource="{x:Bind list}" DisplayMemberPath="Title" SelectedIndex="{x:Bind Pivot.SelectedIndex,Mode=TwoWay}" Grid.Row="1">
+                <controls:ShyHeader.Background>
+                    <AcrylicBrush x:Name="HeaderBackground" TintColor="#ffffff" FallbackColor="#ffffff" TintOpacity="1" BackgroundSource="Backdrop" />
+                </controls:ShyHeader.Background>
+            </controls:ShyHeader>
         </Grid>
         <Pivot x:Name="Pivot" ItemsSource="{x:Bind list,Mode=OneWay}" Grid.RowSpan="2" SelectionChanged="Pivot_SelectionChanged" PivotItemLoaded="Pivot_PivotItemLoaded" PivotItemUnloading="Pivot_PivotItemUnloading">
             <Pivot.HeaderTemplate>
