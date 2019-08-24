@@ -77,7 +77,7 @@ namespace ShyHeaderPivot
                 if (newSv.VerticalOffset == 0 && (oldSv == null || oldSv != null && oldSv.VerticalOffset == 0))
                     StartScrollProgressAnimation(newSv, false);
                 else if (newSv.VerticalOffset > Threshold && lastOffset > Threshold) // 前后进度都为1时 增加延迟防止闪烁
-                    StartScrollProgressAnimation(newSv, false);
+                    StartScrollProgressAnimation(newSv, true);
                 else if (newSv.VerticalOffset == lastOffset)
                     StartScrollProgressAnimation(newSv, false);
                 else if (newSv.VerticalOffset < Threshold || lastOffset < Threshold) //前后状态不同时 先设置滚动条位置再绑定动画
