@@ -210,9 +210,19 @@ namespace ShyHeaderPivot
                     spinLock.Exit();
             }
 
-            var tintOpacity = (1 - args) * 0.3 + 0.7;
-            GridBackground.TintOpacity = tintOpacity;
-            HeaderBackground.TintOpacity = tintOpacity;
+            if(args == 1)
+            {
+                GridBackground.TintOpacity = 0.8;
+                HeaderBackground.TintOpacity = 0.65;
+            }
+            else
+            {
+                if (GridBackground.TintOpacity != 1)
+                    GridBackground.TintOpacity = 1;
+
+                if (HeaderBackground.TintOpacity != 1)
+                    HeaderBackground.TintOpacity = 1;
+            }
 
         }
 
